@@ -12,32 +12,31 @@ export type RequestOptions = {
 }
 
 const identity = (i: any) => i
-const requestMap: {
-    [key: string]: {
-        request: Promise<Result>
-        ts: number // timestamp
-        isError?: boolean
-    }
-} = {}
+// const requestMap: {
+//     [key: string]: {
+//         request: Promise<Result>
+//         ts: number // timestamp
+//         isError?: boolean
+//     }
+// } = {}
 
-const maxLife = 60000 // clear memory cache every minute
-const errorMaxLife = 6000 // clear error memory cache after a second
+// const maxLife = 60000 // clear memory cache every minute
+// const errorMaxLife = 6000 // clear error memory cache after a second
 
-const purgeCache = () => {
-    const now = Date.now()
-    Object.keys(requestMap).forEach((key: string) => {
-        const ttl = requestMap[key].isError ? errorMaxLife : maxLife
-        if (now - requestMap[key].ts >= ttl) {
-            delete requestMap[key]
-        }
-    })
-}
+// const purgeCache = () => {
+//     const now = Date.now()
+//     Object.keys(requestMap).forEach((key: string) => {
+//         const ttl = requestMap[key].isError ? errorMaxLife : maxLife
+//         if (now - requestMap[key].ts >= ttl) {
+//             delete requestMap[key]
+//         }
+//     })
+// }
 
 function request(url: string, options: RequestOptions = {}) {
-    const { apiVersion = 1, noCache = false, normalizer = identity } = options
+    const { apiVersion = 1, normalizer = identity } = options
     const serverUrl_ = serverUrl.replace(/\/v\d+\/$/, `/v${apiVersion}/`)
-    purgeCache()
-    if (!requestMap[url] || noCache) {
+    // purgeCache()
         const fullUrl = `${serverUrl_}${url}`
         const makeRequest = async (): Promise<Result> => {
             let fetchError: FetchError
@@ -61,12 +60,12 @@ function request(url: string, options: RequestOptions = {}) {
                         const result = (await response.json()) as ErrorResult
                         if (result.message) message = result.message
                     } catch (_) {}
-                    if (requestMap[url]) {
-                        // we got a specific error,
-                        // normally, you'd want to not fetch this again,
-                        // but the api goes down and sends 400s, so allow a refetch after errorMaxLife
-                        requestMap[url].isError = true
-                    }
+                    // if (requestMap[url]) {
+                    //     // we got a specific error,
+                    //     // normally, you'd want to not fetch this again,
+                    //     // but the api goes down and sends 400s, so allow a refetch after errorMaxLife
+                    //     requestMap[url].isError = true
+                    // }
 
                     // we got an error response, throw with the message in the response body json
                     fetchError = new FetchError(
@@ -80,15 +79,13 @@ function request(url: string, options: RequestOptions = {}) {
                 fetchError = new FetchError(unexpectedError.message, fullUrl)
                 // if the request fails with an unspecfied error,
                 // the user can request again after the error timeout
-                if (requestMap[url]) {
-                    requestMap[url].isError = true
-                }
+                // if (requestMap[url]) {
+                //     requestMap[url].isError = true
+                // }
             }
             throw fetchError
         }
-        requestMap[url] = { request: makeRequest(), ts: Date.now() }
-    }
-    return requestMap[url].request
+        return makeRequest()
 }
 
 export default request
